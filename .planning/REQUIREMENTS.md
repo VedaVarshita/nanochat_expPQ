@@ -7,16 +7,16 @@
 
 ### Environment
 
-- [ ] **ENV-01**: `uv sync --extra cpu` installs all dependencies on Apple Silicon without errors
-- [ ] **ENV-02**: `WANDB_RUN=dummy` suppresses wandb and training runs without a wandb account
-- [ ] **ENV-03**: `PYTORCH_ALLOC_CONF=expandable_segments:True` is set and MPS memory is stable across a full 5000-step run
+- [x] **ENV-01**: `uv sync --extra cpu` installs all dependencies on Apple Silicon without errors
+- [x] **ENV-02**: `WANDB_RUN=dummy` suppresses wandb and training runs without a wandb account
+- [x] **ENV-03**: `PYTORCH_ALLOC_CONF=expandable_segments:True` is set and MPS memory is stable across a full 5000-step run
 
 ### Tokenizer
 
-- [ ] **TOK-01**: Dataset downloaded via `python -m nanochat.dataset -n 8` (~2B chars)
-- [ ] **TOK-02**: Tokenizer trained via `scripts/tok_train` with `--max-chars=2000000000`
-- [ ] **TOK-03**: `scripts/tok_eval` runs without error and reports vocab stats
-- [ ] **TOK-04**: Trained tokenizer checkpoint is saved and reused for all subsequent runs (never retrain mid-experiment)
+- [x] **TOK-01**: Dataset downloaded via `python -m nanochat.dataset -n 8` (~2B chars)
+- [x] **TOK-02**: Tokenizer trained via `scripts/tok_train` with `--max-chars=2000000000`
+- [x] **TOK-03**: `scripts/tok_eval` runs without error and reports vocab stats
+- [x] **TOK-04**: Trained tokenizer checkpoint is saved and reused for all subsequent runs (never retrain mid-experiment)
 
 ### Baseline Pretraining
 

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 1 context gathered (discuss mode)
-last_updated: "2026-04-04T03:56:43.074Z"
-last_activity: 2026-04-01 — Roadmap created
+status: executing
+stopped_at: Completed 01-baseline-reproduction/01-01-PLAN.md
+last_updated: "2026-04-04T04:44:52.639Z"
+last_activity: 2026-04-04
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 4
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md
 
 **Core value:** A reproducible local MPS baseline to fairly compare tokenizer and architecture experiments
-**Current focus:** Phase 1 — Baseline Reproduction
+**Current focus:** Phase 01 — baseline-reproduction
 
 ## Current Position
 
-Phase: 1 of 3 (Baseline Reproduction)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-04-01 — Roadmap created
+Phase: 01 (baseline-reproduction) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-04-04
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01-baseline-reproduction P01 | 3 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -61,6 +62,8 @@ Progress: [░░░░░░░░░░] 0%
 - [Roadmap]: torch.compile outcome on MPS is empirically unknown — document as success or eager fallback during Phase 1 execution
 - [Roadmap]: BPB is the primary metric throughout; CORE score is a sanity check only (expect extreme noise at d6/5000 steps)
 - [Roadmap]: Tokenizer checkpoint trained in Phase 1 must never be retrained; it is reused for all Phase 2 and Phase 3 runs
+- [Phase 01-01]: Tokenizer checkpoint is .pkl/.pt pair at ~/.cache/nanochat/tokenizer/ (not .model file) — rustbpe saves this format; hashes locked for all future runs
+- [Phase 01-01]: PyTorch 2.9.1 installed (plan assumed 2.10.0); uv resolved latest compatible version — no material impact on MPS/CPU float32 training
 
 ### Pending Todos
 
@@ -73,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-04T03:56:43.064Z
-Stopped at: Phase 1 context gathered (discuss mode)
-Resume file: .planning/phases/01-baseline-reproduction/01-CONTEXT.md
+Last session: 2026-04-04T04:44:52.635Z
+Stopped at: Completed 01-baseline-reproduction/01-01-PLAN.md
+Resume file: None

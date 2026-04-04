@@ -25,7 +25,7 @@ This project forks nanoChat to run reproducible LLM pretraining experiments on A
 **Plans:** 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Environment setup + tokenizer training
+- [x] 01-01-PLAN.md — Environment setup + tokenizer training
 - [ ] 01-02-PLAN.md — Base pretraining run 1 (5000 steps)
 - [ ] 01-03-PLAN.md — Evaluation (CORE score) + SFT sanity check
 - [ ] 01-04-PLAN.md — Reproducibility run + BASELINE.md documentation
