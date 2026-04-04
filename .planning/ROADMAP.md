@@ -22,7 +22,14 @@ This project forks nanoChat to run reproducible LLM pretraining experiments on A
   3. val_bpb is logged every 100 steps and a complete 50-point loss curve exists in the run log
   4. A second identical run (same seed, same config) produces val_bpb within ±0.005 of the first run; seed, config flags, data version, and tokenizer checkpoint are recorded
   5. `chat_sft` completes and `chat_cli` generates coherent text (qualitative check passes)
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Environment setup + tokenizer training
+- [ ] 01-02-PLAN.md — Base pretraining run 1 (5000 steps)
+- [ ] 01-03-PLAN.md — Evaluation (CORE score) + SFT sanity check
+- [ ] 01-04-PLAN.md — Reproducibility run + BASELINE.md documentation
+
 **UI hint**: no
 
 ### Phase 2: Tokenizer Experiments
@@ -53,6 +60,6 @@ This project forks nanoChat to run reproducible LLM pretraining experiments on A
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Baseline Reproduction | 0/? | Not started | - |
+| 1. Baseline Reproduction | 0/4 | Planning complete | - |
 | 2. Tokenizer Experiments | 0/? | Not started | - |
 | 3. Architecture Experiments | 0/? | Not started | - |
