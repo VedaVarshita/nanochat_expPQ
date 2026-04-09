@@ -35,7 +35,7 @@ echo "=== chat_sft ==="
 curl -L -o $NANOCHAT_BASE_DIR/identity_conversations.jsonl \
     https://karpathy-public.s3.us-west-2.amazonaws.com/identity_conversations.jsonl
 
-torchrun --nproc_per_node=2 -m scripts.chat_sft -- \
+torchrun --nproc_per_node=2 -m scripts.V_chat_sft -- \
     --max-seq-len=512 \
     --device-batch-size=16 \
     --total-batch-size=16384 \
