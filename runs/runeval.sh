@@ -41,6 +41,7 @@ torchrun --nproc_per_node=2 -m scripts.chat_sft -- \
     --total-batch-size=16384 \
     --eval-every=200 \
     --eval-tokens=524288 \
+    --chatcore-every=-1 \
     --num-iterations=1500 \
     --run=$WANDB_RUN \
     2>&1 | tee veda/logs/sft1.txt
