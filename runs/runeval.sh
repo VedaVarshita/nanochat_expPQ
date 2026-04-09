@@ -27,6 +27,7 @@ CUDA_VISIBLE_DEVICES=1 python -m scripts.base_eval \
     --device-batch-size=1 \
     --split-tokens=16384 \
     --max-per-task=16 \
+    --eval bpb,core \
     2>&1 | tee veda/logs/eval1.txt
 
 # Step 2: Download SFT data and fine-tune (SFT-01, SFT-02)
