@@ -36,7 +36,7 @@ python -m scripts.tok_eval
 
 # Pretraining: 5000 steps on 2x Titan V via DDP
 # total-batch-size=16384 split across 2 GPUs => device-batch-size=32 each (32*512*2 = 32768 tokens/step)
-torchrun --nproc_per_node=2 -m scripts.base_train \
+torchrun --nproc_per_node=2 -m scripts.base_train -- \
     --depth=6 \
     --head-dim=64 \
     --window-pattern=L \
