@@ -505,3 +505,59 @@ class GPT(nn.Module):
             ids = torch.cat((ids, next_ids), dim=1)
             token = next_ids.item()
             yield token
+
+
+class GPTEncoder(GPT):
+    """
+    GPT with the lm_head projection removed — outputs hidden states of shape (B, T, n_embd).
+    Equivalent to a wav2vec 2.0 / BERT-style encoder. Useful for representation learning,
+    feature extraction, or downstream tasks that need token-level embeddings.
+
+    Usage:
+        encoder = GPTEncoder(config)
+        # load weights from a pretrained GPT checkpoint (lm_head weights are ignored)
+        hidden = encoder(idx)  # (B, T, n_embd)
+    """
+
+    def forward(self, idx, kv_cache=None):
+        B, T = idx.size()
+
+        assert T <= self.cos.size(1)
+        T0 = 0 if kv_cache is None else kv_cache.get_pos()
+        cos_sin = self.cos[:, T0:T0+T], self.sin[:, T0:T0+T]
+
+        x = self.transformer.wte(idx)
+        x = x.to(COMPUTE_DTYPE)
+        x = norm(x)
+
+        # Smear
+        if kv_cache is None:
+            assert T > 1
+            gate = self.smear_lambda.to(x.dtype) * torch.sigmoid(self.smear_gate(x[:, 1:, :24]))
+            x = torch.cat([x[:, :1], x[:, 1:] + gate * x[:, :-1]], dim=1)
+        else:
+            x_pre_smear = kv_cache.prev_embedding
+            kv_cache.prev_embedding = x[:, -1:, :]
+            if T > 1:
+                gate = self.smear_lambda.to(x.dtype) * torch.sigmoid(self.smear_gate(x[:, 1:, :24]))
+                x = torch.cat([x[:, :1], x[:, 1:] + gate * x[:, :-1]], dim=1)
+            elif x_pre_smear is not None:
+                gate = self.smear_lambda.to(x.dtype) * torch.sigmoid(self.smear_gate(x[:, :, :24]))
+                x = x + gate * x_pre_smear
+
+        x0 = x
+        n_layer = self.config.n_layer
+        backout_layer = n_layer // 2
+        x_backout = None
+        for i, block in enumerate(self.transformer.h):
+            x = self.resid_lambdas[i] * x + self.x0_lambdas[i] * x0
+            ve = self.value_embeds[str(i)](idx).to(x.dtype) if str(i) in self.value_embeds else None
+            x = block(x, ve, cos_sin, self.window_sizes[i], kv_cache)
+            if i == backout_layer:
+                x_backout = x
+
+        if x_backout is not None:
+            x = x - self.backout_lambda.to(x.dtype) * x_backout
+
+        x = norm(x)  # (B, T, n_embd) — final hidden states, no lm_head projection
+        return x
