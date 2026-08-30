@@ -15,6 +15,9 @@ Baseline training script for `GPTEncoder` using **next-token prediction** — id
 - `--core-metric-every` and `--sample-every` default to `-1` (no generation without lm_head).
 - Compare val bpb from this run against `base_train.py` at the same depth to isolate architecture effect.
 
+### `scripts/encoder_pretrain.py` — fix val loader unpacking in evaluate_encoder_bpb
+`tokenizing_distributed_data_loader_bos_bestfit` yields `(x, y)` (2 values); the `_with_state_` train variant yields `(x, y, state_dict)`. The val loop was incorrectly unpacking 3 values, causing `ValueError: not enough values to unpack`.
+
 ### `scripts/encoder_pretrain.py` — BoxedLayer wired to FFUFeaturizer
 Replaced the stub `raise NotImplementedError` in `BoxedLayer.__call__` with a concrete `FFUFeaturizer`-based implementation.
 - Imports `FFUFeaturizer` from `BI` module
