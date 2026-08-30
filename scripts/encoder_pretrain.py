@@ -409,30 +409,27 @@ def get_weight_decay(it):
     return weight_decay_scaled * 0.5 * (1 + math.cos(math.pi * it / num_iterations))
 
 # -----------------------------------------------------------------------------
-# Validation: evaluate encoder bpb on held-out data
-def evaluate_encoder_bpb(encoder_model, val_loader, eval_steps, token_bytes):
-    """Same bpb metric as base_train.py but computed through encoder + one_hot_matrix projection."""
+# Validation: average cross-entropy loss using BoxedLayer targets
+# (bpb is not applicable here — targets are cluster labels, not vocab tokens)
+def evaluate_encoder_bpb(encoder_model, val_loader, eval_steps):
     total_loss = torch.tensor(0.0, device=device)
-    total_bytes = torch.tensor(0.0, device=device)
+    total_tokens = torch.tensor(0, device=device)
     encoder_model.eval()
     with torch.no_grad():
-        for i, (xv, yv) in enumerate(val_loader):
+        for i, (xv, _) in enumerate(val_loader):
             if i >= eval_steps:
                 break
             hidden = encoder_model(xv)
-            loss = compute_loss(hidden, yv, reduction='none')  # (B*T,)
-            # Convert nats → bits, weight by byte length of each token
-            mask = (yv.view(-1) != -1)
-            valid_tokens = yv.view(-1)[mask]
-            tbytes = token_bytes[valid_tokens].sum()
-            total_loss += loss[mask].sum()
-            total_bytes += tbytes
+            targets = boxed_layer(hidden.detach())   # (B, T) class indices
+            loss = compute_loss(hidden, targets, reduction='none')  # (B*T,)
+            total_loss += loss.sum()
+            total_tokens += loss.numel()
     if ddp:
         dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
-        dist.all_reduce(total_bytes, op=dist.ReduceOp.SUM)
-    bpb = (total_loss / total_bytes / math.log(2)).item()
+        dist.all_reduce(total_tokens, op=dist.ReduceOp.SUM)
+    avg_loss = (total_loss / total_tokens).item()
     encoder_model.train()
-    return bpb
+    return avg_loss
 
 # -----------------------------------------------------------------------------
 # Training loop
@@ -466,7 +463,7 @@ while True:
         val_loader = build_val_loader()
         eval_steps = args.eval_tokens // (args.device_batch_size * args.max_seq_len * ddp_world_size)
         with disable_fp8_ctx([orig_encoder]):
-            val_bpb = evaluate_encoder_bpb(orig_encoder, val_loader, eval_steps, token_bytes)
+            val_bpb = evaluate_encoder_bpb(orig_encoder, val_loader, eval_steps)
         print0(f"Step {step:05d} | Validation bpb: {val_bpb:.6f}")
         if val_bpb < min_val_bpb:
             min_val_bpb = val_bpb

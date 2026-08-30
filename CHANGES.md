@@ -15,6 +15,9 @@ Baseline training script for `GPTEncoder` using **next-token prediction** — id
 - `--core-metric-every` and `--sample-every` default to `-1` (no generation without lm_head).
 - Compare val bpb from this run against `base_train.py` at the same depth to isolate architecture effect.
 
+### `scripts/encoder_pretrain.py` — fix evaluate_encoder_bpb to use BoxedLayer targets
+Val function was passing raw dataloader `yv` (vocab token IDs up to 32767) to `compute_loss`, which expects BoxedLayer class indices in `[0, NUM_LABELS)`. Rewrote to run BoxedLayer on val hidden states and return average cross-entropy loss. bpb (bits-per-byte) is not applicable for clustering objectives.
+
 ### `scripts/encoder_pretrain.py` — fix val loader unpacking in evaluate_encoder_bpb
 `tokenizing_distributed_data_loader_bos_bestfit` yields `(x, y)` (2 values); the `_with_state_` train variant yields `(x, y, state_dict)`. The val loop was incorrectly unpacking 3 values, causing `ValueError: not enough values to unpack`.
 
