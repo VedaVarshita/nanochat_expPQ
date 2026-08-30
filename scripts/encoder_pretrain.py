@@ -173,23 +173,20 @@ class BoxedLayer:
     """
     def __init__(self):
         self.relu_flag = False  # TODO: set as needed for FFUFeaturizer
-        # d = per-sample input dim, k = number of output classes
-        # reshape in __call__ yields (B*n_embd, T) patches → d=T, k=NUM_LABELS
-        d = args.max_seq_len   # TODO: confirm d matches FFUFeaturizer's expected input dim
+        # One label per token: d = n_embd (features per token), k = NUM_LABELS
+        d = n_embd
         k = NUM_LABELS
-        self.feat = FFUFeaturizer(d, k, device=device, label=False, log_label=False,
+        self.feat = FFUFeaturizer(d, k, device=device, label=True, log_label=False,
                                   n=1, softmax=True, dtype=torch.float)
 
     def __call__(self, hidden: torch.Tensor) -> torch.Tensor:
         # hidden: (B, T, n_embd) — detached, no grad
-        print(hidden.shape)
-        x_unfold = hidden
-        # Reshape: treat each (embedding-dim, batch) slice as a sample with T features
-        # (B, T, n_embd) → transpose → (B, n_embd, T) → view → (B*n_embd, T)
-        patch_vec = x_unfold.transpose(1, 2).contiguous().view(
-            x_unfold.shape[0] * x_unfold.shape[2], x_unfold.shape[1]
-        )
-        return self.feat.update(patch_vec, Z=None, Y=None, relu_flag=self.relu_flag)
+        B, T, C = hidden.shape
+        # Each token is one sample: (B*T, n_embd)
+        patch_vec = hidden.reshape(B * T, C)
+        out = self.feat.update(patch_vec, Z=None, Y=None, relu_flag=self.relu_flag)
+        # out: (B*T, k) soft probabilities (softmax=True) → argmax → integer indices
+        return out.argmax(dim=-1).view(B, T)  # (B, T)
 
 boxed_layer = BoxedLayer()
 
