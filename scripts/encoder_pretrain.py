@@ -26,6 +26,7 @@ import math
 import argparse
 from dataclasses import asdict
 from contextlib import contextmanager
+from BI import FFUFeaturizer
 
 import wandb
 import torch
@@ -169,16 +170,26 @@ class BoxedLayer:
 
     Active on epoch 0 and every 20th epoch (k-means style refresh).
     Between refresh epochs, previously cached outputs are replayed.
-
-    ┌─────────────────────────────────────────────────────────────┐
-    │  IMPLEMENT __call__ with your custom NN / lookup logic.     │
-    │  Input:  hidden  (B, T, n_embd)  — detached, no grad       │
-    │  Output: (B, T)  integer tensor, values in [0, NUM_LABELS)  │
-    └─────────────────────────────────────────────────────────────┘
     """
-    def __call__(self, hidden: torch.Tensor) -> torch.Tensor: # TODO
-        # hidden: (B, T, n_embd) — detached
-        raise NotImplementedError("Fill in BoxedLayer.__call__ with your custom NN logic.")
+    def __init__(self):
+        self.relu_flag = False  # TODO: set as needed for FFUFeaturizer
+        # d = per-sample input dim, k = number of output classes
+        # reshape in __call__ yields (B*n_embd, T) patches → d=T, k=NUM_LABELS
+        d = args.max_seq_len   # TODO: confirm d matches FFUFeaturizer's expected input dim
+        k = NUM_LABELS
+        self.feat = FFUFeaturizer(d, k, device=device, label=False, log_label=False,
+                                  n=1, softmax=True, dtype=torch.float)
+
+    def __call__(self, hidden: torch.Tensor) -> torch.Tensor:
+        # hidden: (B, T, n_embd) — detached, no grad
+        print(hidden.shape)
+        x_unfold = hidden
+        # Reshape: treat each (embedding-dim, batch) slice as a sample with T features
+        # (B, T, n_embd) → transpose → (B, n_embd, T) → view → (B*n_embd, T)
+        patch_vec = x_unfold.transpose(1, 2).contiguous().view(
+            x_unfold.shape[0] * x_unfold.shape[2], x_unfold.shape[1]
+        )
+        return self.feat.update(patch_vec, Z=None, Y=None, relu_flag=self.relu_flag)
 
 boxed_layer = BoxedLayer()
 

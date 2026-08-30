@@ -15,6 +15,13 @@ Baseline training script for `GPTEncoder` using **next-token prediction** — id
 - `--core-metric-every` and `--sample-every` default to `-1` (no generation without lm_head).
 - Compare val bpb from this run against `base_train.py` at the same depth to isolate architecture effect.
 
+### `scripts/encoder_pretrain.py` — BoxedLayer wired to FFUFeaturizer
+Replaced the stub `raise NotImplementedError` in `BoxedLayer.__call__` with a concrete `FFUFeaturizer`-based implementation.
+- Imports `FFUFeaturizer` from `BI` module
+- `BoxedLayer.__init__(n_embd)` instantiates `FFUFeaturizer(d=max_seq_len, k=NUM_LABELS, ...)`
+- `__call__` reshapes hidden `(B, T, n_embd) → (B*n_embd, T)` and calls `feat.update(patch_vec, ...)`
+- Fixed syntax error in class definition (`class BoxedLayer(self, H)` → `class BoxedLayer`) and moved class-level statements into `__init__`
+
 ### `scripts/encoder_pretrain.py` + `docs/encoder_head_design.md` — BoxedLayer target assignment (k-means style)
 Added `BoxedLayer` stub class and a 20-epoch target-cache refresh schedule between the encoder hidden states and `one_hot_matrix`.
 - `BoxedLayer.__call__(hidden) → (B, T) class indices`: user-implemented nearest-neighbor / custom NN. Called with `hidden.detach()` under `torch.no_grad()` — no backprop flows through it.
