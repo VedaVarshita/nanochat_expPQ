@@ -182,11 +182,10 @@ class BoxedLayer:
     def __call__(self, hidden: torch.Tensor) -> torch.Tensor:
         # hidden: (B, T, n_embd) — detached, no grad
         B, T, C = hidden.shape
-        # Each token is one sample: (B*T, n_embd)
-        patch_vec = hidden.reshape(B * T, C)
-        out = self.feat.update(patch_vec, Z=None, Y=None, relu_flag=self.relu_flag)
-        # out: (B*T, k) soft probabilities (softmax=True) → argmax → integer indices
-        return out.argmax(dim=-1).view(B, T)  # (B, T)
+        patch_vec = hidden.reshape(B * T, C)          # (B*T, n_embd)
+        U = self.feat.update(patch_vec, Z=None, Y=None, relu_flag=self.relu_flag)  # (k, n_embd)
+        logits = patch_vec @ U.T                      # (B*T, k)
+        return logits.argmax(dim=-1).view(B, T)       # (B, T)
 
 boxed_layer = BoxedLayer()
 
