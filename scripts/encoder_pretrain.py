@@ -284,9 +284,10 @@ def disable_fp8_ctx(modules):
             setattr(parent, attr_name, fp8_module)
 
 # -----------------------------------------------------------------------------
-# Compile both modules
+# Compile both modules (CUDA only — inductor touches GPU context even on CPU runs)
 orig_encoder = encoder
-encoder = torch.compile(encoder, dynamic=False)
+if device_type == "cuda":
+    encoder = torch.compile(encoder, dynamic=False)
 # one_hot_matrix is a plain tensor — no compile needed
 
 # -----------------------------------------------------------------------------
