@@ -502,7 +502,8 @@ while True:
     current_dataloader_epoch = dataloader_state_dict['epoch']
     if current_dataloader_epoch != prev_dataloader_epoch:
         prev_dataloader_epoch = current_dataloader_epoch
-    is_refresh_epoch = (current_dataloader_epoch % 20 == 0)
+    # Also treat as refresh if cache was never built (handles loaders that start at epoch != 0)
+    is_refresh_epoch = (current_dataloader_epoch % 20 == 0) or (not target_cache)
     if is_refresh_epoch and current_dataloader_epoch != cache_built_for_epoch:
         # Start of a new refresh epoch — clear old cache and reset micro-step counter
         target_cache.clear()
