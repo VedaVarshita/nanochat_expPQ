@@ -88,6 +88,9 @@ user_config = vars(args).copy()
 
 # -----------------------------------------------------------------------------
 device_type = autodetect_device_type() if args.device_type == "" else args.device_type
+if device_type != "cuda":
+    # inductor initialises a CUDA FakeTensor context even on CPU/MPS runs, causing OOM
+    torch._dynamo.config.disable = True
 ddp, ddp_rank, ddp_local_rank, ddp_world_size, device = compute_init(device_type)
 master_process = ddp_rank == 0
 synchronize = torch.cuda.synchronize if device_type == "cuda" else lambda: None
