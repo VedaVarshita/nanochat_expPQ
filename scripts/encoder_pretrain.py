@@ -181,13 +181,14 @@ class BoxedLayer:
         k = NUM_LABELS
         self.feat = FFUFeaturizer(d, k, device=device, label=True, log_label=False,
                                   n=1, softmax=True, dtype=torch.float)
+        self.U: torch.Tensor | None = None  # set on first __call__; used by compute_loss
 
     def __call__(self, hidden: torch.Tensor) -> torch.Tensor:
         # hidden: (B, T, n_embd) — detached, no grad
         B, T, C = hidden.shape
         patch_vec = hidden.reshape(B * T, C)          # (B*T, n_embd)
-        U = self.feat.update(patch_vec, Z=None, Y=None, relu_flag=self.relu_flag)  # (k, n_embd)
-        logits = patch_vec @ U.T                      # (B*T, k)
+        self.U = self.feat.update(patch_vec, Z=None, Y=None, relu_flag=self.relu_flag)  # (k, n_embd)
+        logits = patch_vec @ self.U.T                 # (B*T, k)
         return logits.argmax(dim=-1).view(B, T)       # (B, T)
 
 boxed_layer = BoxedLayer()
@@ -216,7 +217,7 @@ def compute_loss(hidden, targets, reduction='mean'):
     Returns:
         scalar loss (or per-token tensor if reduction='none')
     """
-    logits = hidden @ one_hot_matrix.T          # (B, T, NUM_LABELS)
+    logits = hidden @ boxed_layer.U.T           # (B, T, NUM_LABELS)
     logits = logits.float()
     softcap = 15.0
     logits = softcap * torch.tanh(logits / softcap)

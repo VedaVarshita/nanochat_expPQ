@@ -15,6 +15,9 @@ Baseline training script for `GPTEncoder` using **next-token prediction** — id
 - `--core-metric-every` and `--sample-every` default to `-1` (no generation without lm_head).
 - Compare val bpb from this run against `base_train.py` at the same depth to isolate architecture effect.
 
+### `scripts/encoder_pretrain.py` — use BoxedLayer.U as projection matrix in compute_loss
+`one_hot_matrix` was all zeros so logits were always 0 and loss was always log(NUM_LABELS) — no gradient flowed. Fixed by storing `U` (FFUFeaturizer's weight matrix, shape `(k, n_embd)`) on `boxed_layer.U` after each `feat.update` call, and using `boxed_layer.U.T` in `compute_loss` instead of `one_hot_matrix`. Now the same matrix assigns clusters AND defines what the encoder is trained to predict.
+
 ### `scripts/encoder_pretrain.py` — fix evaluate_encoder_bpb to use BoxedLayer targets
 Val function was passing raw dataloader `yv` (vocab token IDs up to 32767) to `compute_loss`, which expects BoxedLayer class indices in `[0, NUM_LABELS)`. Rewrote to run BoxedLayer on val hidden states and return average cross-entropy loss. bpb (bits-per-byte) is not applicable for clustering objectives.
 
