@@ -227,6 +227,9 @@ def compute_loss(hidden, targets, reduction='mean'):
     """
     logits = hidden @ boxed_layer.U.T           # (B, T, NUM_LABELS)
     logits = logits.float()
+    # Clamp before softcap: large random-init activations can overflow to ±inf,
+    # causing inf + (-inf) = NaN. Clamp keeps values in the tanh's effective range.
+    logits = torch.clamp(logits, min=-1e4, max=1e4)
     softcap = 15.0
     logits = softcap * torch.tanh(logits / softcap)
     loss = F.cross_entropy(
