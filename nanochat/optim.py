@@ -373,17 +373,21 @@ class DistMuonAdamW(torch.optim.Optimizer):
         param_infos = {}
         for p in group['params']:
             grad = p.grad
+            if grad is None:
+                # Frozen param or unused param — skip. Matches standard PyTorch optimizer behaviour.
+                param_infos[p] = dict(skip=True)
+                continue
             if p.numel() < 1024:
                 # Small params: all_reduce (no scatter/gather needed)
                 future = dist.all_reduce(grad, op=dist.ReduceOp.AVG, async_op=True).get_future()
-                param_infos[p] = dict(future=future, grad_slice=grad, is_small=True)
+                param_infos[p] = dict(future=future, grad_slice=grad, is_small=True, skip=False)
             else:
                 # Large params: reduce_scatter
                 assert grad.shape[0] % world_size == 0, f"AdamW reduce_scatter requires shape[0] ({grad.shape[0]}) divisible by world_size ({world_size})"
                 rank_size = grad.shape[0] // world_size
                 grad_slice = torch.empty_like(grad[:rank_size])
                 future = dist.reduce_scatter_tensor(grad_slice, grad, op=dist.ReduceOp.AVG, async_op=True).get_future()
-                param_infos[p] = dict(future=future, grad_slice=grad_slice, is_small=False)
+                param_infos[p] = dict(future=future, grad_slice=grad_slice, is_small=False, skip=False)
         return dict(param_infos=param_infos)
 
     def _reduce_muon(self, group: dict, world_size: int) -> dict:
@@ -412,6 +416,8 @@ class DistMuonAdamW(torch.optim.Optimizer):
         param_infos = info['param_infos']
         for p in group['params']:
             pinfo = param_infos[p]
+            if pinfo.get('skip'):
+                continue
             pinfo['future'].wait()
             grad_slice = pinfo['grad_slice']
             state = self.state[p]

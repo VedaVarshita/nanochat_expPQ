@@ -6,8 +6,13 @@ All modifications made to [karpathy/nanochat](https://github.com/karpathy/nanoch
 
 ## Uncommitted (current session)
 
-### `scripts/encoder_pretrain.py` — freeze lm_head to fix DDP reduce_scatter crash
-`GPTEncoder` inherits `lm_head` from `GPT` but never uses it in `forward()`. In DDP, the optimizer's `_reduce_adamw` tries to do reduce_scatter on `lm_head.weight.grad`, which is `None`, crashing with `AttributeError: 'NoneType' object has no attribute 'shape'`. Fixed by calling `encoder.lm_head.weight.requires_grad_(False)` after `init_weights()` and before `setup_optimizer()`, so the parameter is excluded from all optimizer groups.
+### `nanochat/optim.py` — skip None-grad params in DistMuonAdamW._reduce_adamw / _compute_adamw
+`_reduce_adamw` accessed `p.grad.shape` without a None guard, crashing when any AdamW-group param had no gradient (e.g. frozen `lm_head` in `GPTEncoder`). Added `if grad is None: skip` in `_reduce_adamw` and matching `if pinfo.get('skip'): continue` in `_compute_adamw`. Matches standard PyTorch optimizer behavior.
+
+### `scripts/encoder_pretrain.py` — remove dead one_hot_matrix; fix eval not to update FFUFeaturizer; freeze lm_head
+- Removed `one_hot_matrix` (was defined but never used — `compute_loss` already uses `boxed_layer.U.T`)
+- `evaluate_encoder_bpb` called `boxed_layer(hidden.detach())` which invoked `feat.update`, corrupting FFUFeaturizer training statistics with val data. Replaced with direct `hidden @ boxed_layer.U.T` argmax — same targets, no side-effects.
+- `encoder.lm_head.weight.requires_grad_(False)` added after `init_weights()`: documents that `lm_head` is intentionally excluded from training in `GPTEncoder`.
 
 ### `scripts/encoder_baseline.py` — new file
 Baseline training script for `GPTEncoder` using **next-token prediction** — identical objective to `base_train.py` for a fair apples-to-apples comparison.

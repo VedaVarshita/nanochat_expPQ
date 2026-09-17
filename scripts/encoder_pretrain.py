@@ -161,13 +161,6 @@ NUM_LABELS = 128  # TODO: CHANGE THIS to your actual number of label classes
 
 n_embd = model_config.n_embd
 
-# one_hot_matrix: fixed (not learned) projection matrix.
-# Shape: (NUM_LABELS, n_embd). Row i = target representation for class i.
-# Fill this manually before training:
-#   one_hot_matrix[class_id] = some_vector_of_shape_(n_embd,)
-# Gradients flow through the encoder regardless of this matrix's values.
-one_hot_matrix = torch.zeros(NUM_LABELS, n_embd, dtype=COMPUTE_DTYPE, device=device) #TODO - from Boxed layer
-
 class BoxedLayer:
     """
     Maps encoder hidden states to integer class indices (B, T) in [0, NUM_LABELS).
@@ -436,7 +429,11 @@ def evaluate_encoder_bpb(encoder_model, val_loader, eval_steps):
             if i >= eval_steps:
                 break
             hidden = encoder_model(xv)
-            targets = boxed_layer(hidden.detach())   # (B, T) class indices
+            # Use boxed_layer.U directly (argmax) without calling feat.update —
+            # that would corrupt FFUFeaturizer training statistics with val data.
+            B, T, C = hidden.shape
+            logits_val = hidden.reshape(B * T, C).float() @ boxed_layer.U.T  # (B*T, k)
+            targets = logits_val.argmax(dim=-1).view(B, T)
             loss = compute_loss(hidden, targets, reduction='none')  # (B*T,)
             total_loss += loss.sum()
             total_tokens += loss.numel()
