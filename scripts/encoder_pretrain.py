@@ -181,15 +181,21 @@ class BoxedLayer:
         k = NUM_LABELS
         self.feat = FFUFeaturizer(d, k, device=device, label=True, log_label=False,
                                   n=1, softmax=True, dtype=torch.float)
-        self.U: torch.Tensor | None = None  # set on first __call__; used by compute_loss
+        # Random unit-norm rows: gives non-trivial logits from step 0.
+        # Replaced by FFUFeaturizer's U once feat.update returns valid (non-all-NaN) values.
+        self.U = F.normalize(
+            torch.randn(NUM_LABELS, n_embd, device=device, dtype=torch.float), dim=-1
+        )
 
     def __call__(self, hidden: torch.Tensor) -> torch.Tensor:
         # hidden: (B, T, n_embd) — detached, no grad
         B, T, C = hidden.shape
         patch_vec = hidden.reshape(B * T, C)          # (B*T, n_embd)
-        self.U = self.feat.update(patch_vec, Z=None, Y=None, relu_flag=self.relu_flag)  # (k, n_embd)
-        # F starts at zero → log(0) = -inf → U = NaN on first call; clamp to finite values.
-        self.U = torch.nan_to_num(self.U, nan=0.0, posinf=15.0, neginf=-15.0)
+        raw_U = self.feat.update(patch_vec, Z=None, Y=None, relu_flag=self.relu_flag)  # (k, n_embd)
+        # Only adopt raw_U once FFUFeaturizer has accumulated enough data (F > 0).
+        # When F=0, log(F) = -inf and U = NaN; keep previous self.U (random init) instead.
+        if torch.isfinite(raw_U).any():
+            self.U = torch.nan_to_num(raw_U, nan=0.0, posinf=15.0, neginf=-15.0)
         logits = patch_vec @ self.U.T                 # (B*T, k)
         return logits.argmax(dim=-1).view(B, T)       # (B, T)
 
