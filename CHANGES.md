@@ -6,6 +6,9 @@ All modifications made to [karpathy/nanochat](https://github.com/karpathy/nanoch
 
 ## Uncommitted (current session)
 
+### `scripts/encoder_pretrain.py` — freeze lm_head to fix DDP reduce_scatter crash
+`GPTEncoder` inherits `lm_head` from `GPT` but never uses it in `forward()`. In DDP, the optimizer's `_reduce_adamw` tries to do reduce_scatter on `lm_head.weight.grad`, which is `None`, crashing with `AttributeError: 'NoneType' object has no attribute 'shape'`. Fixed by calling `encoder.lm_head.weight.requires_grad_(False)` after `init_weights()` and before `setup_optimizer()`, so the parameter is excluded from all optimizer groups.
+
 ### `scripts/encoder_baseline.py` — new file
 Baseline training script for `GPTEncoder` using **next-token prediction** — identical objective to `base_train.py` for a fair apples-to-apples comparison.
 - Architecture: `GPTEncoder` backbone + external `stub_head = Linear(n_embd, vocab)` + softcap + cross-entropy. Only structural difference vs. `base_train.py` is that `lm_head` lives outside the backbone.

@@ -147,6 +147,10 @@ model_config_kwargs = asdict(model_config)
 print0(f"GPTEncoder config:\n{json.dumps(model_config_kwargs, indent=2)}")
 encoder.to_empty(device=device)
 encoder.init_weights()
+# lm_head exists on GPTEncoder (inherited from GPT) but is never used in forward().
+# Freeze it so setup_optimizer excludes it — otherwise DDP reduce_scatter crashes
+# on None grad when the param appears in an optimizer group but never receives gradient.
+encoder.lm_head.weight.requires_grad_(False)
 
 # -----------------------------------------------------------------------------
 # ┌──────────────────────────────────────────────────────────────────────────┐
