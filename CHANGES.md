@@ -6,6 +6,10 @@ All modifications made to [karpathy/nanochat](https://github.com/karpathy/nanoch
 
 ## Uncommitted (current session)
 
+### `scripts/encoder_probe.py` — new file
+Linear probe evaluation script for comparing GPTEncoder checkpoints.
+Loads a frozen encoder (any checkpoint under `base_checkpoints/`), trains a fresh `Linear(n_embd, vocab_size)` probe head on next-token prediction for a fixed number of steps, and reports val bits-per-byte — the same metric as `base_train.py` and `encoder_baseline.py`. Run twice with `--checkpoint enc_baseline_d6` and `--checkpoint enc_d6` to compare how much next-token information is linearly decodable from each encoder's representations. Single GPU, no torchrun needed.
+
 ### `nanochat/optim.py` — skip None-grad params in DistMuonAdamW._reduce_adamw / _compute_adamw
 `_reduce_adamw` accessed `p.grad.shape` without a None guard, crashing when any AdamW-group param had no gradient (e.g. frozen `lm_head` in `GPTEncoder`). Added `if grad is None: skip` in `_reduce_adamw` and matching `if pinfo.get('skip'): continue` in `_compute_adamw`. Matches standard PyTorch optimizer behavior.
 
