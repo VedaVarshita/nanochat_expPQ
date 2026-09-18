@@ -371,7 +371,7 @@ def evaluate_encoder_bpb(encoder_model, val_loader, eval_steps, token_bytes):
     encoder_model.eval()
     stub_head.eval()
     with torch.no_grad():
-        for i, (xv, yv, _) in enumerate(val_loader):
+        for i, (xv, yv) in enumerate(val_loader):
             if i >= eval_steps:
                 break
             hidden = encoder_model(xv)
