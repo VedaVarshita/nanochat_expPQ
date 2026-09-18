@@ -198,12 +198,9 @@ class BoxedLayer:
 
 boxed_layer = BoxedLayer()
 
-# Target cache — stores BoxedLayer outputs per micro-step for one full refresh epoch.
-# Replayed for the 19 epochs between refreshes.
-target_cache: list[torch.Tensor] = []   # (B, T) cpu tensors, one per micro-step
-cache_built_for_epoch: int = -1         # dataloader epoch when cache was last built
-micro_step_global: int = 0             # global micro-step counter for cache indexing
-prev_dataloader_epoch: int = 0         # to detect epoch transitions
+# BoxedLayer targets are recomputed every step — FFUFeaturizer.feat.update() is a
+# fast matrix accumulation (no k-means iterations), so caching adds no value and
+# only delays U from improving. Fresh targets every step = continuously improving U.
 
 def compute_loss(hidden, targets, reduction='mean'):
     """
@@ -512,38 +509,14 @@ while True:
     synchronize()
     t0 = time.time()
 
-    # BoxedLayer target refresh schedule (k-means style):
-    # Epoch 0 and every 20th epoch: rebuild target_cache from BoxedLayer outputs.
-    # Other epochs: replay frozen cache.
-    current_dataloader_epoch = dataloader_state_dict['epoch']
-    if current_dataloader_epoch != prev_dataloader_epoch:
-        prev_dataloader_epoch = current_dataloader_epoch
-    # Also treat as refresh if cache was never built (handles loaders that start at epoch != 0)
-    is_refresh_epoch = (current_dataloader_epoch % 20 == 0) or (not target_cache)
-    if is_refresh_epoch and current_dataloader_epoch != cache_built_for_epoch:
-        # Start of a new refresh epoch — clear old cache and reset micro-step counter
-        target_cache.clear()
-        micro_step_global = 0
-        cache_built_for_epoch = current_dataloader_epoch
-
     for micro_step in range(grad_accum_steps):
         # Encoder forward → hidden states
         hidden = encoder(x)                                  # (B, T, n_embd)
 
-        # Determine targets via BoxedLayer (no backprop) or replay from cache
-        if is_refresh_epoch:
-            with torch.no_grad():
-                targets_for_loss = boxed_layer(hidden.detach())  # (B, T) class indices
-            target_cache.append(targets_for_loss.cpu())           # store for future epochs
-        else:
-            if not target_cache:
-                raise RuntimeError(
-                    "target_cache is empty. Ensure epoch 0 (a refresh epoch) "
-                    "completes before non-refresh epochs are used."
-                )
-            cache_idx = micro_step_global % len(target_cache)
-            targets_for_loss = target_cache[cache_idx].to(device)
-        micro_step_global += 1
+        # BoxedLayer assigns targets each step — feat.update accumulates co-occurrence
+        # statistics so U improves continuously throughout training.
+        with torch.no_grad():
+            targets_for_loss = boxed_layer(hidden.detach())  # (B, T) class indices
 
         loss = compute_loss(hidden, targets_for_loss)        # scalar; grads flow through hidden
         train_loss = loss.detach()

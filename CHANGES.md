@@ -10,6 +10,9 @@ All modifications made to [karpathy/nanochat](https://github.com/karpathy/nanoch
 Linear probe evaluation script for comparing GPTEncoder checkpoints.
 Loads a frozen encoder (any checkpoint under `base_checkpoints/`), trains a fresh `Linear(n_embd, vocab_size)` probe head on next-token prediction for a fixed number of steps, and reports val bits-per-byte — the same metric as `base_train.py` and `encoder_baseline.py`. Run twice with `--checkpoint enc_baseline_d6` and `--checkpoint enc_d6` to compare how much next-token information is linearly decodable from each encoder's representations. Single GPU, no torchrun needed.
 
+### `scripts/encoder_pretrain.py` — remove target cache; run BoxedLayer every step
+Probe evaluation showed BoxedLayer encoder learned nothing useful (val bpb 2.42 vs baseline 1.26) because the 20-epoch cache refresh schedule never fired in a 5000-step / 1-epoch run — the encoder spent all 5000 steps training on random-U targets from the initial cache. Fix: removed the target cache entirely and run BoxedLayer on every step. `FFUFeaturizer.feat.update()` is a fast matrix accumulation (no k-means), so caching adds no value; fresh targets every step means U improves continuously and the encoder adapts to real co-occurrence structure. Removed: `target_cache`, `cache_built_for_epoch`, `micro_step_global`, `prev_dataloader_epoch`.
+
 ### `nanochat/optim.py` — skip None-grad params in DistMuonAdamW._reduce_adamw / _compute_adamw
 `_reduce_adamw` accessed `p.grad.shape` without a None guard, crashing when any AdamW-group param had no gradient (e.g. frozen `lm_head` in `GPTEncoder`). Added `if grad is None: skip` in `_reduce_adamw` and matching `if pinfo.get('skip'): continue` in `_compute_adamw`. Matches standard PyTorch optimizer behavior.
 
