@@ -41,7 +41,7 @@ loss = cross_entropy(hidden @ U.T, targets) # train encoder to align hidden with
 **Fixed design (wte embeddings as input):**
 
 ```
-input_emb ← encoder.wte(x)                 # token embeddings, BEFORE transformer
+input_emb ← encoder.transformer.wte(x)     # token embeddings, BEFORE transformer
 U  ← FFUFeaturizer(input_emb)              # U = directions in INPUT embedding space
 targets ← argmax(input_emb @ U.T)          # which input cluster does this token fall in?
 loss = cross_entropy(hidden @ U.T, targets) # encoder trained to predict input cluster
@@ -57,7 +57,7 @@ loss = cross_entropy(hidden @ U.T, targets) # encoder trained to predict input c
 ```
 x (B, T) token IDs
     │
-    ├── orig_encoder.wte(x) → input_emb (B, T, n_embd)    [no grad, input space]
+    ├── orig_encoder.transformer.wte(x) → input_emb (B, T, n_embd)    [no grad, input space]
     │         │
     │    boxed_layer(input_emb)                             [no grad, FFUFeaturizer update]
     │         │

@@ -431,7 +431,7 @@ def evaluate_encoder_bpb(encoder_model, val_loader, eval_steps):
             hidden = encoder_model(xv)
             # Use wte embeddings (input space) for target assignment — matches training.
             # Direct argmax without calling feat.update avoids corrupting FFUFeaturizer stats.
-            input_emb = orig_encoder.wte(xv)                              # (B, T, n_embd)
+            input_emb = orig_encoder.transformer.wte(xv)                    # (B, T, n_embd)
             B, T, C = input_emb.shape
             logits_val = input_emb.reshape(B * T, C).float() @ boxed_layer.U.T  # (B*T, k)
             targets = logits_val.argmax(dim=-1).view(B, T)
@@ -518,7 +518,7 @@ while True:
         # U is derived from what tokens look like on entry; the encoder is trained
         # to predict those input-space cluster assignments from its deep representations.
         with torch.no_grad():
-            input_emb = orig_encoder.wte(x)                   # (B, T, n_embd) input space
+            input_emb = orig_encoder.transformer.wte(x)          # (B, T, n_embd) input space
             targets_for_loss = boxed_layer(input_emb)          # (B, T) class indices
 
         # Encoder forward → hidden states
