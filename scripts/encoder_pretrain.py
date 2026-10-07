@@ -163,13 +163,14 @@ n_embd = model_config.n_embd
 
 class BoxedLayer:
     """
-    Maps encoder hidden states to integer class indices (B, T) in [0, NUM_LABELS).
+    Maps input token embeddings (wte outputs) to integer class indices (B, T) in [0, NUM_LABELS).
 
-    Called under torch.no_grad() using hidden.detach() — no backprop flows through here.
-    Outputs become the 'targets' tensor for cross-entropy via one_hot_matrix.
+    Receives the token embeddings from wte — the input representation BEFORE the transformer
+    runs, not the encoder's hidden states. This breaks the circularity: U is derived from
+    the input distribution (what tokens look like on entry), and the encoder is trained to
+    predict those input-space cluster assignments from its deep representations.
 
-    Active on epoch 0 and every 20th epoch (k-means style refresh).
-    Between refresh epochs, previously cached outputs are replayed.
+    Called under torch.no_grad() — no backprop flows through here.
     """
     def __init__(self):
         self.relu_flag = False  # TODO: set as needed for FFUFeaturizer
@@ -184,10 +185,10 @@ class BoxedLayer:
             torch.randn(NUM_LABELS, n_embd, device=device, dtype=torch.float), dim=-1
         )
 
-    def __call__(self, hidden: torch.Tensor) -> torch.Tensor:
-        # hidden: (B, T, n_embd) — detached, no grad
-        B, T, C = hidden.shape
-        patch_vec = hidden.reshape(B * T, C)          # (B*T, n_embd)
+    def __call__(self, input_emb: torch.Tensor) -> torch.Tensor:
+        # input_emb: (B, T, n_embd) — wte embeddings, detached, no grad
+        B, T, C = input_emb.shape
+        patch_vec = input_emb.reshape(B * T, C)       # (B*T, n_embd)
         raw_U = self.feat.update(patch_vec, Z=None, Y=None, relu_flag=self.relu_flag)  # (k, n_embd)
         # Only adopt raw_U once FFUFeaturizer has accumulated enough data (F > 0).
         # When F=0, log(F) = -inf and U = NaN; keep previous self.U (random init) instead.
@@ -198,9 +199,11 @@ class BoxedLayer:
 
 boxed_layer = BoxedLayer()
 
-# BoxedLayer targets are recomputed every step — FFUFeaturizer.feat.update() is a
-# fast matrix accumulation (no k-means iterations), so caching adds no value and
-# only delays U from improving. Fresh targets every step = continuously improving U.
+# BoxedLayer receives wte embeddings (input space), not encoder hidden states.
+# U = directions in token embedding space; targets = which input cluster each token falls in.
+# The encoder is trained to predict these input-space assignments from its deep representations.
+# This breaks the circular dependency: U is derived from fixed input features, not from
+# the model's own evolving outputs (which caused mode collapse in the hidden-state version).
 
 def compute_loss(hidden, targets, reduction='mean'):
     """
@@ -426,10 +429,11 @@ def evaluate_encoder_bpb(encoder_model, val_loader, eval_steps):
             if i >= eval_steps:
                 break
             hidden = encoder_model(xv)
-            # Use boxed_layer.U directly (argmax) without calling feat.update —
-            # that would corrupt FFUFeaturizer training statistics with val data.
-            B, T, C = hidden.shape
-            logits_val = hidden.reshape(B * T, C).float() @ boxed_layer.U.T  # (B*T, k)
+            # Use wte embeddings (input space) for target assignment — matches training.
+            # Direct argmax without calling feat.update avoids corrupting FFUFeaturizer stats.
+            input_emb = orig_encoder.wte(xv)                              # (B, T, n_embd)
+            B, T, C = input_emb.shape
+            logits_val = input_emb.reshape(B * T, C).float() @ boxed_layer.U.T  # (B*T, k)
             targets = logits_val.argmax(dim=-1).view(B, T)
             loss = compute_loss(hidden, targets, reduction='none')  # (B*T,)
             total_loss += loss.sum()
@@ -510,13 +514,15 @@ while True:
     t0 = time.time()
 
     for micro_step in range(grad_accum_steps):
-        # Encoder forward → hidden states
-        hidden = encoder(x)                                  # (B, T, n_embd)
-
-        # BoxedLayer assigns targets each step — feat.update accumulates co-occurrence
-        # statistics so U improves continuously throughout training.
+        # Targets from input embeddings (wte) — input space, not hidden space.
+        # U is derived from what tokens look like on entry; the encoder is trained
+        # to predict those input-space cluster assignments from its deep representations.
         with torch.no_grad():
-            targets_for_loss = boxed_layer(hidden.detach())  # (B, T) class indices
+            input_emb = orig_encoder.wte(x)                   # (B, T, n_embd) input space
+            targets_for_loss = boxed_layer(input_emb)          # (B, T) class indices
+
+        # Encoder forward → hidden states
+        hidden = encoder(x)                                   # (B, T, n_embd)
 
         loss = compute_loss(hidden, targets_for_loss)        # scalar; grads flow through hidden
         train_loss = loss.detach()

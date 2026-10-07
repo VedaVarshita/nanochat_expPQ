@@ -6,6 +6,22 @@ All modifications made to [karpathy/nanochat](https://github.com/karpathy/nanoch
 
 ## Uncommitted (current session)
 
+### `scripts/encoder_pretrain.py` + `docs/encoder_head_design.md` — fix BoxedLayer circularity: use wte embeddings instead of hidden states
+BoxedLayer was receiving encoder hidden states, causing mode collapse: `U` was derived from the encoder's own outputs, and the encoder was trained toward those same directions — a self-referential fixed point. Probe evaluation confirmed the representations were useless (val bpb 2.34 vs baseline 1.26, probe loss flat at ~7.7 with no improvement).
+
+Fix: pass `wte` token embeddings (input space, before any transformer layer) to BoxedLayer instead of hidden states. `U` now represents directions in input token embedding space; the encoder is trained to predict which input cluster each token belongs to from its deep representations. This matches the Coates & Ng / Krähenbühl et al. pattern: clusters are always derived from input patches, never from the model's own activations.
+
+Changes:
+- `BoxedLayer.__call__` parameter renamed `hidden` → `input_emb` with updated docstring
+- Training loop: `orig_encoder.wte(x)` computed under `no_grad`, passed to `boxed_layer()` before encoder forward pass
+- `evaluate_encoder_bpb`: uses `orig_encoder.wte(xv)` for target argmax (matches training, avoids contaminating FFUFeaturizer stats)
+- Comment block above BoxedLayer explains the circularity fix and literature grounding
+- `docs/encoder_head_design.md` fully rewritten: decision table updated, circularity problem section added, data flow diagram updated, literature grounding added
+
+---
+
+## Committed — GPTEncoder Pretraining Pipeline
+
 ### `scripts/encoder_probe.py` — new file
 Linear probe evaluation script for comparing GPTEncoder checkpoints.
 Loads a frozen encoder (any checkpoint under `base_checkpoints/`), trains a fresh `Linear(n_embd, vocab_size)` probe head on next-token prediction for a fixed number of steps, and reports val bits-per-byte — the same metric as `base_train.py` and `encoder_baseline.py`. Run twice with `--checkpoint enc_baseline_d6` and `--checkpoint enc_d6` to compare how much next-token information is linearly decodable from each encoder's representations. Single GPU, no torchrun needed.
