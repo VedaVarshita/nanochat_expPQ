@@ -4,7 +4,7 @@ All modifications made to [karpathy/nanochat](https://github.com/karpathy/nanoch
 
 ---
 
-## Uncommitted (current session)
+## Committed — BoxedLayer Circularity Fix
 
 ### `scripts/encoder_pretrain.py` + `docs/encoder_head_design.md` — fix BoxedLayer circularity: use wte embeddings instead of hidden states
 BoxedLayer was receiving encoder hidden states, causing mode collapse: `U` was derived from the encoder's own outputs, and the encoder was trained toward those same directions — a self-referential fixed point. Probe evaluation confirmed the representations were useless (val bpb 2.34 vs baseline 1.26, probe loss flat at ~7.7 with no improvement).
